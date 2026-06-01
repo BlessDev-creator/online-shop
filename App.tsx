@@ -1,8 +1,19 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  GoogleSans_400Regular,
+  GoogleSans_500Medium,
+  GoogleSans_600SemiBold,
+  GoogleSans_700Bold,
+} from '@expo-google-fonts/google-sans';
+
+// Apply Google Sans as the default font for all Text components
+(Text as any).defaultProps = { ...((Text as any).defaultProps ?? {}), style: { fontFamily: 'GoogleSans_400Regular' } };
 
 import { AppProvider, useAppContext } from './context/AppContext';
 import { RootStackParamList, TabParamList } from './types';
@@ -85,7 +96,7 @@ function MainTabs() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontFamily: 'GoogleSans_600SemiBold',
           marginTop: 3,
         },
         tabBarIcon: ({ color, size }) => (
@@ -143,6 +154,15 @@ function RootNavigator() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    GoogleSans_400Regular,
+    GoogleSans_500Medium,
+    GoogleSans_600SemiBold,
+    GoogleSans_700Bold,
+  });
+
+  if (!fontsLoaded) return null;
+
   return (
     <AppProvider>
       <NavigationContainer>

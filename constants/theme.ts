@@ -1,3 +1,10 @@
+export const fonts = {
+  regular: 'GoogleSans_400Regular',
+  medium: 'GoogleSans_500Medium',
+  semiBold: 'GoogleSans_600SemiBold',
+  bold: 'GoogleSans_700Bold',
+};
+
 export const theme = {
   light: {
     background: '#FFFFFF', text: '#111111', subText: '#6B6B6B',
