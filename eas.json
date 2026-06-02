@@ -6,11 +6,19 @@
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vmvunpsvhylnriworvsg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtdnVucHN2aHlsbnJpd29ydnNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMjUyNDQsImV4cCI6MjA5NDcwMTI0NH0.ImJWyDo10t4oOO8LxTV7o4ChByKv_PAfONI1OPoB0gc"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vmvunpsvhylnriworvsg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtdnVucHN2aHlsbnJpd29ydnNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMjUyNDQsImV4cCI6MjA5NDcwMTI0NH0.ImJWyDo10t4oOO8LxTV7o4ChByKv_PAfONI1OPoB0gc"
       }
     }
   }
