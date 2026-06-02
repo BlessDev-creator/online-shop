@@ -30,6 +30,12 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5a8fe1c1-7025-4886-8f34-8df864035caa"
+      }
+    },
+    "owner": "blessdev-creator"
   }
 }
