@@ -39,6 +39,9 @@ const STATUS_ICON: Record<string, string> = {
   cancelled: 'x-circle',
 };
 
+const ALLOWED_AVATAR_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_UPLOAD_BYTES    = 5 * 1024 * 1024; // 5 MB
+
 // ─── Action grid cell ─────────────────────────────────────────────────────────
 function GridCell({
   label,
@@ -151,7 +154,7 @@ export default function ProfileScreen() {
           const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true, aspect: [1, 1], quality: 0.75,
           });
-          if (!result.canceled && result.assets[0]) uploadAvatarUri(result.assets[0].uri);
+          if (!result.canceled && result.assets[0]) uploadAvatarUri(result.assets[0]);
         },
       },
       {
@@ -165,25 +168,37 @@ export default function ProfileScreen() {
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.75,
           });
-          if (!result.canceled && result.assets[0]) uploadAvatarUri(result.assets[0].uri);
+          if (!result.canceled && result.assets[0]) uploadAvatarUri(result.assets[0]);
         },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
-  const uploadAvatarUri = async (uri: string) => {
+  const uploadAvatarUri = async (asset: ImagePicker.ImagePickerAsset) => {
     const userId = session?.user?.id;
     if (!userId) return;
+
+    // Client-side validation
+    if (asset.mimeType && !ALLOWED_AVATAR_MIME.includes(asset.mimeType)) {
+      Alert.alert('Unsupported File', 'Please use a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) {
+      Alert.alert('File Too Large', `Image is ${(asset.fileSize / 1024 / 1024).toFixed(1)} MB. Maximum is 5 MB.`);
+      return;
+    }
+
     setUploadingAvatar(true);
     try {
-      const response = await fetch(uri);
+      const response = await fetch(asset.uri);
       const blob     = await response.blob();
+      const mime     = asset.mimeType ?? 'image/jpeg';
       const filePath = `${userId}/avatar.jpg`;
 
       const { error: uploadErr } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+        .upload(filePath, blob, { contentType: mime, upsert: true });
       if (uploadErr) throw uploadErr;
 
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);

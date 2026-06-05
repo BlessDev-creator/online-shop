@@ -7,7 +7,7 @@ import {
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../supabase';
-import { Order, Product, RootStackParamList } from '../../types';
+import { Order, OrderItem, Product, RootStackParamList } from '../../types';
 import { theme, getImageUrl, parsePrice } from '../../constants/theme';
 import { useAppContext } from '../../context/AppContext';
 
@@ -51,7 +51,16 @@ function orderActions(status: Order['status']): string[] {
 }
 
 // ─── Order card ───────────────────────────────────────────────────────────────
-function OrderCard({ order, colors }: { order: Order; colors: any }) {
+interface OrderCardProps {
+  order: Order;
+  colors: any;
+  onCancelOrder: (orderId: string) => void;
+  onBuyAgain: (orderId: string, orderItems: OrderItem[]) => void;
+  isCancelling: boolean;
+  isBuyingAgain: boolean;
+}
+
+function OrderCard({ order, colors, onCancelOrder, onBuyAgain, isCancelling, isBuyingAgain }: OrderCardProps) {
   const meta = STATUS_META[order.status] ?? STATUS_META.pending;
   const actions = orderActions(order.status);
   const itemCount = order.order_items?.length ?? 0;
@@ -106,17 +115,31 @@ function OrderCard({ order, colors }: { order: Order; colors: any }) {
         </Text>
 
         <View style={cardStyles.actionRow}>
-          {actions.map(action => (
-            <TouchableOpacity
-              key={action}
-              style={[cardStyles.actionBtn, { borderColor: colors.border }]}
-              activeOpacity={0.75}
-            >
-              <Text style={[cardStyles.actionBtnTxt, { color: colors.text }]}>
-                {action}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {actions.map(action => {
+            const isCancel = action === 'Cancel Order';
+            const isBuyAgain = action === 'Buy Again';
+            const isLoading = (isCancel && isCancelling) || (isBuyAgain && isBuyingAgain);
+            return (
+              <TouchableOpacity
+                key={action}
+                style={[cardStyles.actionBtn, { borderColor: isCancel ? '#F4433640' : colors.border, opacity: isLoading ? 0.6 : 1 }]}
+                activeOpacity={0.75}
+                disabled={isLoading}
+                onPress={() => {
+                  if (isCancel) onCancelOrder(order.id);
+                  else if (isBuyAgain) onBuyAgain(order.id, order.order_items ?? []);
+                }}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={isCancel ? '#F44336' : colors.text} />
+                ) : (
+                  <Text style={[cardStyles.actionBtnTxt, { color: isCancel ? '#F44336' : colors.text }]}>
+                    {action}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </View>
@@ -319,7 +342,7 @@ const recStyles = StyleSheet.create({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function OrderCenterScreen({ route, navigation }: Props) {
-  const { isDarkMode, session } = useAppContext();
+  const { isDarkMode, session, addToCart } = useAppContext();
   const colors = isDarkMode ? theme.dark : theme.light;
 
   const initTab: Tab = (route.params?.initialTab as Tab) ?? 'All';
@@ -327,6 +350,8 @@ export default function OrderCenterScreen({ route, navigation }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [buyingAgainId, setBuyingAgainId] = useState<string | null>(null);
 
   const tabScrollRef = useRef<ScrollView>(null);
 
@@ -346,6 +371,84 @@ export default function OrderCenterScreen({ route, navigation }: Props) {
     const { data } = await supabase.from('products').select('*').limit(6);
     setRecommendations((data as Product[]) ?? []);
   }, []);
+
+  const handleCancelOrder = useCallback((orderId: string) => {
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingId(orderId);
+            const { error } = await supabase
+              .from('orders')
+              .update({ status: 'cancelled' })
+              .eq('id', orderId);
+            setCancellingId(null);
+            if (error) {
+              Alert.alert('Error', 'Failed to cancel order. Please try again.');
+              return;
+            }
+            setOrders(prev =>
+              prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' as const } : o)
+            );
+          },
+        },
+      ],
+    );
+  }, []);
+
+  const handleBuyAgain = useCallback(async (orderId: string, orderItems: OrderItem[]) => {
+    if (!orderItems.length) return;
+    setBuyingAgainId(orderId);
+
+    const productIds = orderItems.map(i => i.product_id);
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', productIds);
+
+    setBuyingAgainId(null);
+
+    if (error || !products) {
+      Alert.alert('Error', 'Could not fetch product details. Please try again.');
+      return;
+    }
+
+    const outOfStock: string[] = [];
+    let addedCount = 0;
+
+    for (const item of orderItems) {
+      const product = (products as Product[]).find(p => p.id === item.product_id);
+      if (!product) continue;
+      if (product.stock_quantity !== null && product.stock_quantity <= 0) {
+        outOfStock.push(product.name);
+        continue;
+      }
+      for (let i = 0; i < item.quantity; i++) {
+        addToCart(product);
+      }
+      addedCount++;
+    }
+
+    if (outOfStock.length > 0) {
+      const allOutOfStock = outOfStock.length === orderItems.length;
+      Alert.alert(
+        'Out of Stock',
+        allOutOfStock
+          ? 'All items from this order are currently out of stock.'
+          : `Some items are out of stock and were skipped:\n• ${outOfStock.join('\n• ')}`,
+      );
+      if (allOutOfStock) return;
+    }
+
+    if (addedCount > 0) {
+      navigation.navigate('MainTabs', { screen: 'Cart' } as any);
+    }
+  }, [addToCart, navigation]);
 
   useEffect(() => {
     fetchOrders();
@@ -437,7 +540,16 @@ export default function OrderCenterScreen({ route, navigation }: Props) {
               )}
             </View>
           }
-          renderItem={({ item }) => <OrderCard order={item} colors={colors} />}
+          renderItem={({ item }) => (
+            <OrderCard
+              order={item}
+              colors={colors}
+              onCancelOrder={handleCancelOrder}
+              onBuyAgain={handleBuyAgain}
+              isCancelling={cancellingId === item.id}
+              isBuyingAgain={buyingAgainId === item.id}
+            />
+          )}
         />
       )}
     </SafeAreaView>

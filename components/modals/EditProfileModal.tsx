@@ -10,7 +10,9 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '../../supabase';
 import { UserProfile } from '../../types';
 
-const ACCENT = '#8EE53F';
+const ACCENT             = '#8EE53F';
+const ALLOWED_AVATAR_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_UPLOAD_BYTES    = 5 * 1024 * 1024; // 5 MB
 
 interface Props {
   visible: boolean;
@@ -24,8 +26,9 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
   const [name, setName]           = useState('');
   const [email, setEmail]         = useState('');
   const [saving, setSaving]       = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [uploading, setUploading]     = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [previewUri, setPreviewUri]   = useState<string | null>(null);
 
   // Sync form state when modal opens
   useEffect(() => {
@@ -33,6 +36,7 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
       setName(user?.full_name ?? '');
       setEmail(user?.email ?? session?.user?.email ?? '');
       setPreviewUri(user?.avatar_url ?? null);
+      setUploadError(null);
     }
   }, [visible, user, session]);
 
@@ -40,21 +44,33 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
   const emailChanged = email.trim().toLowerCase() !== currentEmail;
 
   // ── Avatar upload ────────────────────────────────────────────────────────────
-  const uploadAvatar = async (uri: string) => {
+  const uploadAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
     const userId = session?.user?.id;
     if (!userId) return;
 
+    // Client-side validation
+    if (asset.mimeType && !ALLOWED_AVATAR_MIME.includes(asset.mimeType)) {
+      setUploadError('Unsupported file type. Please use JPEG, PNG, or WebP.');
+      return;
+    }
+    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) {
+      setUploadError(`Image too large (${(asset.fileSize / 1024 / 1024).toFixed(1)} MB). Maximum is 5 MB.`);
+      return;
+    }
+
+    setUploadError(null);
     setUploading(true);
-    setPreviewUri(uri); // optimistic local preview
+    setPreviewUri(asset.uri); // optimistic local preview
 
     try {
-      const response = await fetch(uri);
+      const response = await fetch(asset.uri);
       const blob     = await response.blob();
+      const mime     = asset.mimeType ?? 'image/jpeg';
 
       const filePath = `${userId}/avatar.jpg`;
       const { error: uploadErr } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+        .upload(filePath, blob, { contentType: mime, upsert: true });
 
       if (uploadErr) throw uploadErr;
 
@@ -74,8 +90,9 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
       setPreviewUri(urlWithBust);
       await onSaved(); // refresh context so header updates immediately
     } catch (err: any) {
-      Alert.alert('Upload Failed', err.message ?? 'Could not upload image.');
-      setPreviewUri(user?.avatar_url ?? null); // revert
+      const msg = err.message ?? 'Could not upload image.';
+      setUploadError(msg);
+      setPreviewUri(user?.avatar_url ?? null); // revert on failure
     } finally {
       setUploading(false);
     }
@@ -95,7 +112,7 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
             allowsEditing: true, aspect: [1, 1], quality: 0.75,
           });
           if (!result.canceled && result.assets[0]) {
-            await uploadAvatar(result.assets[0].uri);
+            await uploadAvatar(result.assets[0]);
           }
         },
       },
@@ -114,7 +131,7 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
             quality: 0.75,
           });
           if (!result.canceled && result.assets[0]) {
-            await uploadAvatar(result.assets[0].uri);
+            await uploadAvatar(result.assets[0]);
           }
         },
       },
@@ -230,6 +247,9 @@ export default function EditProfileModal({ visible, onClose, user, session, onSa
               <Text style={styles.avatarHint}>
                 {uploading ? 'Uploading…' : 'Tap photo to change'}
               </Text>
+              {uploadError !== null && (
+                <Text style={styles.uploadErrorTxt}>{uploadError}</Text>
+              )}
             </View>
 
             {/* ── Form ─────────────────────────────────────────────────── */}
@@ -412,7 +432,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  avatarHint: { fontSize: 13, color: '#999', marginTop: 10 },
+  avatarHint:      { fontSize: 13, color: '#999', marginTop: 10 },
+  uploadErrorTxt:  { fontSize: 12, color: '#E53935', marginTop: 6, textAlign: 'center', paddingHorizontal: 20 },
 
   // Section label
   sectionLabel: {

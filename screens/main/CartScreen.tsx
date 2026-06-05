@@ -12,7 +12,7 @@ import { Product, RootStackParamList } from '../../types';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function CartScreen() {
-  const { cart, updateQuantity, placeOrder, isDarkMode, addToCart } = useAppContext();
+  const { cart, updateQuantity, placeOrder, isDarkMode, addToCart, clearCart } = useAppContext();
   const navigation = useNavigation<Nav>();
   const colors = isDarkMode ? theme.dark : theme.light;
 
@@ -84,6 +84,18 @@ export default function CartScreen() {
     }
   };
 
+  const handleCancelAll = () => {
+    if (cart.length === 0) return;
+    Alert.alert(
+      'Remove All Items',
+      'Are you sure you want to remove all items from your cart?',
+      [
+        { text: 'No', style: 'cancel' },
+        { text: 'Yes, Remove All', style: 'destructive', onPress: clearCart },
+      ],
+    );
+  };
+
   const handleFlashSaleItemPress = (product: Product) => {
     navigation.navigate('ProductDetails', { product });
   };
@@ -106,7 +118,7 @@ export default function CartScreen() {
         totalPrice={`UGX ${selectedTotal.toLocaleString()}`}
         onToggleItem={handleToggleItem}
         onSelectAll={handleSelectAll}
-        onCancelAll={() => setSelectedIds([])}
+        onCancelAll={handleCancelAll}
         onQuantityChange={handleQuantityChange}
         onCheckout={handleCheckout}
         isCheckingOut={isCheckingOut}

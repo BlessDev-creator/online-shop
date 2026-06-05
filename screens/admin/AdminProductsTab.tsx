@@ -41,7 +41,9 @@ const BADGE_PRESETS = [
   { label: 'Featured',   color: '#9C27B0' },
 ];
 
-const STORAGE_BUCKET = 'product-images';
+const STORAGE_BUCKET       = 'product-images';
+const ALLOWED_PRODUCT_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_UPLOAD_BYTES     = 5 * 1024 * 1024; // 5 MB
 
 export default function AdminProductsTab({ colors }: Props) {
   const { user } = useAppContext();
@@ -55,7 +57,8 @@ export default function AdminProductsTab({ colors }: Props) {
   const [editing, setEditing]           = useState<Product | null>(null);
   const [form, setForm]                 = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving]             = useState(false);
-  const [uploading, setUploading]       = useState(false);
+  const [uploading, setUploading]         = useState(false);
+  const [uploadError, setUploadError]     = useState<string | null>(null);
   const [imgPreviewErr, setImgPreviewErr] = useState(false);
 
   // Picked local assets from the device gallery
@@ -110,6 +113,7 @@ export default function AdminProductsTab({ colors }: Props) {
     setEditing(null);
     setForm(EMPTY_FORM);
     setImgPreviewErr(false);
+    setUploadError(null);
     setPickedAssets([]);
     setModalVisible(true);
   };
@@ -128,12 +132,14 @@ export default function AdminProductsTab({ colors }: Props) {
       stock_quantity: String(p.stock_quantity ?? 100),
     });
     setImgPreviewErr(false);
+    setUploadError(null);
     setPickedAssets([]);
     setModalVisible(true);
   };
 
   const closeModal = () => {
     setModalVisible(false);
+    setUploadError(null);
     setPickedAssets([]);
   };
 
@@ -166,9 +172,19 @@ export default function AdminProductsTab({ colors }: Props) {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      setPickedAssets(result.assets);
-      // Show the first picked image in the URL preview field so the user can see it instantly
-      setField('image_url')(result.assets[0].uri);
+      const valid   = result.assets.filter(a =>
+        (!a.mimeType || ALLOWED_PRODUCT_MIME.includes(a.mimeType)) &&
+        (!a.fileSize  || a.fileSize <= MAX_UPLOAD_BYTES),
+      );
+      const skipped = result.assets.length - valid.length;
+      if (skipped > 0) {
+        setUploadError(`${skipped} file(s) skipped — must be JPEG, PNG, or WebP and under 5 MB.`);
+      } else {
+        setUploadError(null);
+      }
+      if (valid.length === 0) return;
+      setPickedAssets(valid);
+      setField('image_url')(valid[0].uri);
       setImgPreviewErr(false);
     }
   };
@@ -177,9 +193,10 @@ export default function AdminProductsTab({ colors }: Props) {
   const uploadFirstAsset = async (): Promise<string | null> => {
     if (pickedAssets.length === 0) return null;
 
-    const asset = pickedAssets[0];
-    const ext   = (asset.uri.split('.').pop() ?? 'jpg').toLowerCase();
-    const path  = `${Date.now()}_${asset.fileName ?? 'product'}.${ext}`;
+    const asset    = pickedAssets[0];
+    const rawName  = asset.fileName ?? `product.${(asset.uri.split('.').pop() ?? 'jpg').toLowerCase()}`;
+    const safeName = rawName.replace(/\s+/g, '-');
+    const path     = `admin/${Date.now()}-${safeName}`;
 
     const response = await fetch(asset.uri);
     const blob     = await response.blob();
@@ -213,10 +230,9 @@ export default function AdminProductsTab({ colors }: Props) {
         const uploaded = await uploadFirstAsset();
         if (uploaded) finalImageUrl = uploaded;
       } catch (err: any) {
-        Alert.alert(
-          'Image Upload Failed',
-          err.message ?? 'Could not upload image to server. Please try again.',
-        );
+        const msg = err.message ?? 'Could not upload image to server. Please try again.';
+        setUploadError(msg);
+        Alert.alert('Image Upload Failed', msg);
         setSaving(false);
         setUploading(false);
         return;
@@ -625,6 +641,14 @@ export default function AdminProductsTab({ colors }: Props) {
                 </View>
               </View>
 
+              {/* ── Upload error ────────────────────────────────────── */}
+              {uploadError !== null && (
+                <View style={[styles.errorNote, { borderColor: '#FFCDD2' }]}>
+                  <Feather name="alert-circle" size={14} color="#C62828" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#C62828', fontSize: 13, flex: 1 }}>{uploadError}</Text>
+                </View>
+              )}
+
               {/* ── Upload progress note ────────────────────────────── */}
               {uploading && (
                 <View style={[styles.uploadNote, { backgroundColor: colors.inputBg }]}>
@@ -958,5 +982,15 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     marginTop: 12,
+  },
+  errorNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    marginTop: 4,
+    borderWidth: 1,
   },
 });
