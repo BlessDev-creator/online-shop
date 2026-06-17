@@ -137,8 +137,13 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
 
   const ratingNum = parseFloat(product.rating ?? '4.5');
 
-  const handleAddToCart = () => {
-    addToCart(product);
+  const handleAddToCart = async () => {
+    const result = await addToCart(product);
+    if (!result.success) {
+      Alert.alert('Unable to add item', result.error);
+      return;
+    }
+
     Alert.alert(
       'Added to Cart',
       `${product.name} has been added to your cart.`,
@@ -149,8 +154,13 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
     );
   };
 
-  const handleBuyNow = () => {
-    addToCart(product);
+  const handleBuyNow = async () => {
+    const result = await addToCart(product);
+    if (!result.success) {
+      Alert.alert('Unable to add item', result.error);
+      return;
+    }
+
     navigation.navigate('MainTabs', { screen: 'Cart' } as any);
   };
 
@@ -374,7 +384,8 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           {
             backgroundColor: colors.background,
             borderTopColor: colors.border,
-            paddingBottom: Platform.OS === 'ios' ? 24 : 14,
+            paddingTop: 10,
+            paddingBottom: Platform.OS === 'ios' ? 18 : 10,
           },
         ]}
       >
@@ -397,7 +408,10 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           onPress={handleAddToCart}
           activeOpacity={0.85}
         >
-          <Text style={[styles.actionBtnTxt, { color: '#000' }]}>Add to Cart</Text>
+          <View style={styles.actionBtnInner}>
+            <Feather name="shopping-bag" size={17} color="#000" />
+            <Text style={[styles.actionBtnTxt, { color: '#000' }]}>Add to Cart</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Buy Now */}
@@ -406,7 +420,10 @@ export default function ProductDetailScreen({ route, navigation }: Props) {
           onPress={handleBuyNow}
           activeOpacity={0.85}
         >
-          <Text style={[styles.actionBtnTxt, { color: '#fff' }]}>Buy Now</Text>
+          <View style={styles.actionBtnInner}>
+            <Feather name="credit-card" size={17} color="#fff" />
+            <Text style={[styles.actionBtnTxt, { color: '#fff' }]}>Buy Now</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -583,7 +600,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderTopWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
@@ -612,12 +630,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   actionCartBadgeTxt: { color: '#000', fontSize: 10, fontWeight: '800' },
+  actionBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionBtn: {
     flex: 1,
-    height: 48,
+    height: 50,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionBtnTxt: { fontSize: 15, fontWeight: '800' },
+  actionBtnTxt: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
 });

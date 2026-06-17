@@ -10,6 +10,7 @@ import { Order, UserProfile } from '../../types';
 interface Props { colors: any; }
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] as const;
+const PROGRESS_STEPS = ['pending', 'confirmed', 'shipped', 'delivered'] as const;
 const STATUS_COLORS: Record<string, string> = {
   pending: '#FF9800', confirmed: '#2196F3', shipped: '#9C27B0',
   delivered: '#4CAF50', cancelled: '#F44336',
@@ -20,6 +21,7 @@ export default function AdminOrdersTab({ colors }: Props) {
   const [userMap, setUserMap] = useState<Record<string, UserProfile>>({});
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [expandedProgress, setExpandedProgress] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   const fetchOrders = useCallback(async () => {
@@ -139,7 +141,39 @@ export default function AdminOrdersTab({ colors }: Props) {
                   Placed: {formatDate(selectedOrder.created_at)}
                 </Text>
 
-                <Text style={{ color: colors.text, fontWeight: 'bold', marginBottom: 8 }}>Items</Text>
+                <TouchableOpacity
+                  style={[styles.progressDropdown, { borderColor: colors.border }]}
+                  onPress={() => setExpandedProgress(v => !v)}
+                >
+                  <View>
+                    <Text style={{ color: colors.subText, fontSize: 12 }}>Customer</Text>
+                    <Text style={{ color: colors.text, fontWeight: '700', marginTop: 2 }}>
+                      {userMap[selectedOrder.user_id]?.full_name ?? userMap[selectedOrder.user_id]?.email ?? selectedOrder.user_id.slice(0, 12)}
+                    </Text>
+                  </View>
+                  <Feather name={expandedProgress ? 'chevron-up' : 'chevron-down'} size={18} color={colors.subText} />
+                </TouchableOpacity>
+
+                {expandedProgress && (
+                  <View style={[styles.progressPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    {PROGRESS_STEPS.map((step, index) => {
+                      const isDone = index < PROGRESS_STEPS.indexOf(selectedOrder.status as (typeof PROGRESS_STEPS)[number]);
+                      const isCurrent = step === selectedOrder.status;
+                      return (
+                        <View key={step} style={styles.progressRow}>
+                          <View style={[styles.progressCircle, isDone && styles.progressCircleDone, isCurrent && styles.progressCircleCurrent]}>
+                            <Feather name={isDone ? 'check' : 'truck'} size={12} color={isDone || isCurrent ? '#fff' : colors.subText} />
+                          </View>
+                          <Text style={{ color: colors.text, fontSize: 13, textTransform: 'capitalize', marginLeft: 10 }}>
+                            {step}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <Text style={{ color: colors.text, fontWeight: 'bold', marginTop: 18, marginBottom: 8 }}>Items</Text>
                 {selectedOrder.order_items?.map(item => (
                   <View key={item.id} style={[styles.itemRow, { borderBottomColor: colors.border }]}>
                     <Text style={{ color: colors.text, flex: 1 }} numberOfLines={1}>{item.product_name}</Text>
@@ -178,6 +212,12 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
+  progressDropdown: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderWidth: 1, borderRadius: 12, marginBottom: 10 },
+  progressPanel: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  progressCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' },
+  progressCircleDone: { backgroundColor: '#4CAF50' },
+  progressCircleCurrent: { backgroundColor: '#8EE53F' },
   itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1 },
   statusBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
 });

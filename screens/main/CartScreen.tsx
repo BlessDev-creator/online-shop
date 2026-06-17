@@ -70,7 +70,12 @@ export default function CartScreen() {
   const handleSelectAll     = (select: boolean) =>
     setSelectedIds(select ? cart.map(i => i.product.id) : []);
 
-  const handleQuantityChange = (id: string, qty: number) => updateQuantity(id, qty);
+  const handleQuantityChange = async (id: string, qty: number) => {
+    const result = await updateQuantity(id, qty);
+    if (!result.success && result.error) {
+      Alert.alert('Quantity update failed', result.error);
+    }
+  };
 
   const handleCheckout = async () => {
     if (isCheckingOut) return;
@@ -100,8 +105,13 @@ export default function CartScreen() {
     navigation.navigate('ProductDetails', { product });
   };
 
-  const handleAddFlashSaleToCart = (product: Product) => {
-    addToCart(product);
+  const handleAddFlashSaleToCart = async (product: Product) => {
+    const result = await addToCart(product);
+    if (!result.success) {
+      Alert.alert('Unable to add item', result.error);
+      return;
+    }
+
     Alert.alert('Added to Cart', `${product.name} added to your cart!`, [
       { text: 'OK' },
     ]);

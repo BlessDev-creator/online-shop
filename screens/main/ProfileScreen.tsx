@@ -248,6 +248,19 @@ export default function ProfileScreen() {
       })
     : null;
 
+  const latestOrder = orders[0];
+  const shippingSteps = [
+    { key: 'pending', label: 'Placed', note: 'We got your order' },
+    { key: 'confirmed', label: 'Packed', note: 'Ready for dispatch' },
+    { key: 'shipped', label: 'On the way', note: 'Rider is moving' },
+    { key: 'delivered', label: 'Delivered', note: 'Order completed' },
+  ];
+  const currentStepIndex = latestOrder
+    ? shippingSteps.findIndex(step => step.key === latestOrder.status)
+    : -1;
+  const visibleStepIndex = currentStepIndex >= 0 ? currentStepIndex : 0;
+  const currentShippingStep = shippingSteps[visibleStepIndex] ?? shippingSteps[0];
+
   // Order grid — tapping navigates to OrderCenter with the right initial tab
   const orderGridItems = [
     {
@@ -346,30 +359,80 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ══ Stats card (overlaps green header) ══ */}
+        {/* ══ Shipping progress card (replaces the old stats chips) ══ */}
         <View
           style={[
-            styles.statsCard,
+            styles.shippingCard,
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {[
-            { label: 'Coupons',  value: '5' },
-            { label: 'Wallet',   value: fmtWalletShort(walletBalance) },
-            { label: 'Wishlist', value: '8' },
-            { label: 'Owned',    value: String(orders.length) },
-          ].map((s, i, arr) => (
-            <View
-              key={s.label}
-              style={[
-                styles.statItem,
-                i < arr.length - 1 && { borderRightWidth: 1, borderRightColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.statVal, { color: colors.text }]}>{s.value}</Text>
-              <Text style={[styles.statLbl, { color: colors.subText }]}>{s.label}</Text>
+          <View style={styles.shippingHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.shippingEyebrow, { color: colors.subText }]}>Shipping Tracker</Text>
+              <Text style={[styles.shippingTitle, { color: colors.text }]}>Your delivery progress</Text>
             </View>
-          ))}
+            <View style={styles.motorIllustration}>
+              <View style={styles.motorBadge}>
+                <MaterialCommunityIcons name="motorbike" size={24} color="#fff" />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.shippingBody}>
+            <View style={styles.progressRail} />
+            {shippingSteps.map((step, index) => {
+              const isDone = index < visibleStepIndex;
+              const isCurrent = index === visibleStepIndex;
+              const isCancelled = latestOrder?.status === 'cancelled';
+              return (
+                <View key={step.key} style={styles.progressStep}>
+                  <View
+                    style={[
+                      styles.progressDot,
+                      isDone && styles.progressDotDone,
+                      isCurrent && !isCancelled && styles.progressDotCurrent,
+                      isCancelled && styles.progressDotCancelled,
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={
+                        isDone
+                          ? 'check'
+                          : step.key === 'shipped'
+                            ? 'truck-fast'
+                            : step.key === 'confirmed'
+                              ? 'package-variant'
+                              : step.key === 'delivered'
+                                ? 'home-variant'
+                                : 'receipt'
+                      }
+                      size={12}
+                      color={isDone || isCurrent ? '#fff' : colors.subText}
+                    />
+                  </View>
+                  <View style={styles.progressTextWrap}>
+                    <Text style={[styles.progressLabel, { color: colors.text }]}>{step.label}</Text>
+                    <Text style={[styles.progressNote, { color: colors.subText }]}>{step.note}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={[styles.shippingFooter, { borderTopColor: colors.border }]}>
+            <Text style={[styles.currentStepTitle, { color: colors.text }]}>
+              {latestOrder
+                ? `${latestOrder.id.slice(0, 8).toUpperCase()} · ${currentShippingStep.label}`
+                : 'No active order yet'}
+            </Text>
+            <Text style={[styles.currentStepNote, { color: colors.subText }]}>
+              {latestOrder
+                ? latestOrder.status === 'cancelled'
+                  ? 'This order has been cancelled.'
+                  : currentShippingStep.note
+                : 'Start shopping to see your shipping progress here.'}
+            </Text>
+          </View>
         </View>
 
         {/* ══ My Wallet card — tapping navigates to dedicated Wallet screen ══ */}
@@ -783,23 +846,92 @@ const styles = StyleSheet.create({
   },
   editTxt: { color: 'rgba(31,61,17,0.85)', fontSize: 13, fontWeight: '600' },
 
-  // Stats card
-  statsCard: {
-    flexDirection: 'row',
+  // Shipping tracker card
+  shippingCard: {
     marginHorizontal: 16,
     marginTop: -18,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
+    padding: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 5,
-    overflow: 'hidden',
   },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  statVal: { fontSize: 20, fontWeight: '800' },
-  statLbl: { fontSize: 11, marginTop: 3 },
+  shippingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shippingEyebrow: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  shippingTitle: { fontSize: 16, fontWeight: '800', marginTop: 2 },
+  motorIllustration: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#F2F8E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  motorBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#111',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shippingBody: {
+    position: 'relative',
+    marginTop: 18,
+    paddingLeft: 10,
+  },
+  progressRail: {
+    position: 'absolute',
+    left: 17,
+    top: 8,
+    bottom: 8,
+    width: 3,
+    backgroundColor: '#E7E7E7',
+    borderRadius: 2,
+  },
+  progressStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  progressDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F3F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  progressDotDone: {
+    backgroundColor: '#2E7D32',
+  },
+  progressDotCurrent: {
+    backgroundColor: '#8EE53F',
+  },
+  progressDotCancelled: {
+    backgroundColor: '#F44336',
+  },
+  progressTextWrap: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  progressLabel: { fontSize: 13, fontWeight: '700' },
+  progressNote: { fontSize: 11, marginTop: 2 },
+  shippingFooter: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  currentStepTitle: { fontSize: 13, fontWeight: '700' },
+  currentStepNote: { fontSize: 12, marginTop: 4 },
 
   // My Wallet card
   walletCard: {

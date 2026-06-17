@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../supabase';
 import { useAppContext } from '../../context/AppContext';
+import { getImageUrl } from '../../constants/theme';
 import { Product } from '../../types';
 
 interface Props { colors: any; }
@@ -41,7 +42,7 @@ const BADGE_PRESETS = [
   { label: 'Featured',   color: '#9C27B0' },
 ];
 
-const STORAGE_BUCKET       = 'product-images';
+const STORAGE_BUCKET       = 'gadgets';
 const ALLOWED_PRODUCT_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_UPLOAD_BYTES     = 5 * 1024 * 1024; // 5 MB
 
@@ -207,11 +208,7 @@ export default function AdminProductsTab({ colors }: Props) {
 
     if (error) throw error;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(path);
-
-    return publicUrl;
+    return path;
   };
 
   // ── Save ─────────────────────────────────────────────────────────────────────
@@ -288,7 +285,7 @@ export default function AdminProductsTab({ colors }: Props) {
   // ── Image preview URI (URL field or first picked local URI) ──────────────────
   const previewUri = pickedAssets.length > 0
     ? pickedAssets[0].uri
-    : (form.image_url.startsWith('http') ? form.image_url : null);
+    : getImageUrl(form.image_url);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -706,8 +703,8 @@ function ProductRow({
   onDelete: (p: Product) => void;
 }) {
   const [imgErr, setImgErr] = useState(false);
-  const isHttp  = p.image_url?.startsWith('http');
-  const showImg = isHttp && !imgErr;
+  const imageUrl = getImageUrl(p.image_url);
+  const showImg = Boolean(imageUrl && !imgErr);
 
   return (
     <View style={[styles.productRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -715,7 +712,7 @@ function ProductRow({
       <View style={[styles.thumb, { backgroundColor: colors.inputBg }]}>
         {showImg ? (
           <Image
-            source={{ uri: p.image_url! }}
+            source={{ uri: imageUrl! }}
             style={{ width: '100%', height: '100%' }}
             resizeMode="contain"
             onError={() => setImgErr(true)}
